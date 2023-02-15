@@ -47,12 +47,12 @@ namespace cobs_can_bridge
 
 			rclcpp::WallRate(1s).sleep();
 
-			volatile int loop_well_formalize = 0;
+			volatile unsigned int loop_well_formalize = 0;
 			while(handshake())
 			{
 				// このsleepは内部でvolatile領域にアクセスするとかioの関数を呼んでいるんだろうか...一応volatile入れておく。
 				rclcpp::WallRate(1s).sleep();
-				loop_well_formalize = 0;
+				loop_well_formalize = loop_well_formalize;
 			}
 
 			start_listen_can();
@@ -151,13 +151,13 @@ namespace cobs_can_bridge
 			cobs_serial->async_write(hello_usbcan);
 			cobs_serial->async_read
 			(
-				[result_prm = std::move(result_prm)](const std::vector<u8>& data) noexcept
+				[result_prm = std::move(result_prm)](const std::vector<u8>& data) mutable noexcept
 				{
 					bool result{true};
 					
 					constexpr auto hello_cobscan = std::to_array("helloCobsCAN");
 
-					for(int i = 0; i < std::min(data.size(), hello_cobscan.size()); ++i)
+					for(unsigned int i = 0; i < std::min(data.size(), hello_cobscan.size()); ++i)
 					{
 						if(data[i] != hello_cobscan[i])
 						{
