@@ -12,8 +12,8 @@
 
 #include <boost/asio.hpp>
 
-#include <crs_utilities/std_type.hpp>
-#include <crs_utilities/reporter.hpp>
+#include <CRSLibtmp/std_type.hpp>
+#include <CRSLibtmp/reporter.hpp>
 
 #include <cobs_can/pack.hpp>
 
@@ -214,7 +214,7 @@ namespace CRSLib::Usb
 						if(ec)
 						{
 							error_reporter((__FILE__ ": line " Strnize2(__LINE__) ": error: cannot boost::asio::async_write.:" + ec.message()).c_str());
-							this->async_write_inner(std::move(cobsed_frame));  // もう一度書く
+							// this->async_write_inner(std::move(cobsed_frame));  // もう一度書く
 						}
 					}
 				);

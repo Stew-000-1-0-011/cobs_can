@@ -14,22 +14,42 @@ find_package(ament_cmake REQUIRED)
 # find_package(<dependency> REQUIRED)
 
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(crs_utilities REQUIRED)
-find_package(cobs_can_frame REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 
-include_directories(include)
+ament_export_dependencies(rosidl_default_runtime)
 
-add_executable(bridge src/cobs_can_bridge.cpp)
-ament_target_dependencies(bridge
-  rclcpp
-  crs_utilities
-  cobs_can_frame
+set(msg_files
+  "msg/Frame.msg"
 )
 
-# install(TARGETS
-#   bridge
-#   DESTINATION lib/${PROJECT_NAME})
+rosidl_generate_interfaces(${PROJECT_NAME}
+  ${msg_files}
+)
+
+include_directories(include
+  "/home/stew/stew_programming/Library"  #自分の環境でCRSLibtmpを入れたディレクトリのパスに変更すること
+)
+
+add_library(bridge SHARED
+  src/cobs_can_bridge.cpp
+)
+rclcpp_components_register_nodes(bridge "cobs_can_bridge::CobsCanBridge")
+ament_target_dependencies(bridge
+  rclcpp
+  rclcpp_components
+)
+
+rosidl_get_typesupport_target(cpp_typesupport_target
+  ${PROJECT_NAME} "rosidl_typesupport_cpp"
+)
+
+target_link_libraries(bridge "${cpp_typesupport_target}")
+
+install(TARGETS
+  bridge
+  DESTINATION lib)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

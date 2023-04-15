@@ -18,7 +18,9 @@
 #include <vector>
 
 #include <rclcpp/rclcpp.hpp>
-#include <cobs_can_frame/msg/frame.hpp>
+#include <rclcpp_components/register_node_macro.hpp>
+
+#include <cobs_can/msg/frame.hpp>
 
 #include <cobs_can/cobs_serial.hpp>
 #include <cobs_can/reporter.hpp>
@@ -32,8 +34,8 @@ namespace cobs_can_bridge
 		ErrorReporter error_reporter;
 		std::optional<CRSLib::Usb::CobsSerial<ErrorReporter, InfoReporter>> cobs_serial;
 
-		rclcpp::Publisher<cobs_can_frame::msg::Frame>::SharedPtr can_rx_pub;
-		rclcpp::Subscription<cobs_can_frame::msg::Frame>::SharedPtr can_tx_sub;
+		rclcpp::Publisher<cobs_can::msg::Frame>::SharedPtr can_rx_pub;
+		rclcpp::Subscription<cobs_can::msg::Frame>::SharedPtr can_tx_sub;
 
 	public:
 		CobsCanBridge(const rclcpp::NodeOptions & options):
@@ -47,19 +49,18 @@ namespace cobs_can_bridge
 
 			rclcpp::WallRate(1s).sleep();
 
-			volatile unsigned int loop_well_formalize = 0;
 			while(handshake())
 			{
 				// このsleepは内部でvolatile領域にアクセスするとかioの関数を呼んでいるんだろうか...一応volatile入れておく。
 				rclcpp::WallRate(1s).sleep();
-				loop_well_formalize = loop_well_formalize;
+				[[maybe_unused]] volatile int loop_well_formalize = 0;
 			}
 
 			start_listen_can();
 
 			/// @todo canXXXへの送信。現在はとりあえずcan_rx, can_txへ送受信する
-			can_rx_pub = this->create_publisher<cobs_can_frame::msg::Frame>("can_rx", 1000);
-			can_tx_sub = this->create_subscription<cobs_can_frame::msg::Frame>("can_tx", 1000, std::bind(&CobsCanBridge::can_tx_callback, this, std::placeholders::_1));
+			can_rx_pub = this->create_publisher<cobs_can::msg::Frame>("can_rx", 1000);
+			can_tx_sub = this->create_subscription<cobs_can::msg::Frame>("can_tx", 1000, std::bind(&CobsCanBridge::can_tx_callback, this, std::placeholders::_1));
 		}
 
 	private:
@@ -68,13 +69,13 @@ namespace cobs_can_bridge
 			cobs_serial = std::nullopt;
 		}
 
-		void can_tx_callback(const cobs_can_frame::msg::Frame::SharedPtr frame)
+		void can_tx_callback(const cobs_can::msg::Frame::SharedPtr frame)
 		{
 			/// @todo idをトピックから取得
 			cobs_serial->async_write(convert(frame, 100));
 		}
 
-		static std::vector<u8> convert(const cobs_can_frame::msg::Frame::SharedPtr& frame, const u32 id)
+		static std::vector<u8> convert(const cobs_can::msg::Frame::SharedPtr& frame, const u32 id)
 		{
 			std::vector<u8> buffer(5 + frame->dlc);
 
@@ -92,7 +93,7 @@ namespace cobs_can_bridge
 			return buffer;
 		}
 
-		static std::tuple<cobs_can_frame::msg::Frame, u32> deconvert(const std::vector<u8>& buffer)
+		static std::tuple<cobs_can::msg::Frame, u32> deconvert(const std::vector<u8>& buffer)
 		{
 			u32 id = 0;
 			for(int i = 0; i < 4; ++i)
@@ -100,7 +101,7 @@ namespace cobs_can_bridge
 				id |= buffer[i] << i;
 			}
 
-			cobs_can_frame::msg::Frame frame{};
+			cobs_can::msg::Frame frame{};
 
 			frame.dlc = buffer[4];
 
@@ -174,3 +175,5 @@ namespace cobs_can_bridge
 		}
 	};
 }
+
+RCLCPP_COMPONENTS_REGISTER_NODE(cobs_can_bridge::CobsCanBridge)
