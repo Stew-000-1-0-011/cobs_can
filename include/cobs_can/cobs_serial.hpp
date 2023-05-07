@@ -22,59 +22,11 @@
 
 namespace CRSLib::Usb
 {
-	namespace Implement
-	{
-		struct DefaultErrorReporter final
-		{
-			void operator()(auto&& ... args) const noexcept
-			{
-				try
-				{
-					std::osyncstream sync_err{std::cerr};
-					(sync_err << ... << std::forward<decltype(args)>(args)) << std::endl;
-				}
-				catch(...)
-				{
-					try
-					{
-						std::osyncstream sync_err{std::cerr};
-						sync_err << "Fail to report error." << std::endl;
-					}
-					catch(...){}
-				}
-			}
-		};
-
-		struct DefaultInfoReporter final
-		{
-			void operator()(auto&& ... args) const noexcept
-			{
-				try
-				{
-					std::osyncstream sync_out{std::cout};
-					(sync_out << ... << std::forward<decltype(args)>(args)) << std::endl;
-				}
-				catch(...)
-				{
-					try
-					{
-						std::osyncstream sync_out{std::cerr};
-						sync_out << "Fail to report info." << std::endl;
-					}
-					catch(...){}
-				}
-			}
-		};
-
-		static_assert(reporter<DefaultErrorReporter>);
-		static_assert(reporter<DefaultInfoReporter>);
-	}
-
 	// COBS(Consistent Overhead Byte Stuffing)でシリアル通信を行う
 	// read, write操作を1つずつ並列に実行できる。どちらか一方でも複数同時に行うことはできない
 	// 送受信ともに失敗したら再度試みる。
 	// **全く以てシグナル安全でない**
-	template<reporter ErrorReporter = Implement::DefaultErrorReporter, reporter InfoReporter = Implement::DefaultInfoReporter>
+	template<reporter ErrorReporter = DefaultErrorReporter, reporter InfoReporter = DefaultInfoReporter>
 	class CobsSerial final
 	{
 		// io_contextまわり。おそらく、いくつかのスレッドで並行に実行する処理をまとめたモノ
@@ -119,9 +71,9 @@ namespace CRSLib::Usb
 
 			/// @todo 1秒くらい待つ(下の処理を1秒後に走らせる) <- いるかぁ？
 
-			// 処理を別スレッドで走らせる
-			boost::asio::post(thread_pool,
-				[this]
+			const auto make_io_running_task = [this]
+			{
+				return [this]
 				{
 					try
 					{
@@ -131,7 +83,16 @@ namespace CRSLib::Usb
 					{
 						this->error_reporter(__FILE__ ": line " Strnize2(__LINE__) ": error: boost::asio::io_context::run() throws an exception.");
 					}
-				}
+				};
+			};
+
+			// 処理を別スレッドで走らせる
+			boost::asio::post(thread_pool,
+				make_io_running_task()
+			);
+
+			boost::asio::post(thread_pool,
+				make_io_running_task()
 			);
 
 			info_reporter("CobsSerial initialize completed.");
@@ -189,7 +150,7 @@ namespace CRSLib::Usb
 						if(ec)
 						{
 							error_reporter((__FILE__ ": line " Strnize2(__LINE__) ": error: cannot boost::asio::async_read_until.:" + ec.message()).c_str());
-							this->async_read_inner(std::move(read_handler), std::move(cobsed_frame));  // もう一度読む
+							// this->async_read_inner(std::move(read_handler), std::move(cobsed_frame));  // もう一度読む
 						}
 						else
 						{
